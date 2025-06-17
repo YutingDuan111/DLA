@@ -95,6 +95,22 @@ class Perimeter:
             self.N = shape[0]
             self.center = (self.N // 2, self.N // 2)
 
+
+    #initial_position is a [y, x]  
+    #Takes any input launch point (could be random in the killing radius, or on the perimeter)
+    #and walk it until it EITHER reaches the killing radius or attaches to the perimeter. 
+    #Returns: # 1) the final position of the particle,
+    #         # 2) whether it is lost (True if it reached the killing radius, False if it attached to the perimeter)
+    def walk(self, initial_position):
+        yi, xi = initial_position
+        #fill in the rest
+
+        #always return the return structure commmented above. 
+
+        return {"final_position": (yi, xi), "lost": False} #example
+
+        
+
     def simulate_one_particle(self, n=1, m=1):
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1),
                       (-1, -1), (-1, 1), (1, -1), (1, 1)]
