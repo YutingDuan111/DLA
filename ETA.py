@@ -63,13 +63,37 @@ class Perimeter:
         cx = int(np.mean(xs))
         return cy, cx
     
+    def expand_perimeter_if_needed(self):
+        new_size = int(self.populate_radius*2)  # padding on all sides
+        if new_size <= self.N:
+            return  # no need to expand
+
+        # create a new big grid, and copy the old grid into the center of new grid
+        new_grid = np.zeros((new_size, new_size))
+        offset = (new_size - self.N) // 2
+        new_grid[offset:offset+self.N, offset:offset+self.N] = self.perimeter
+
+        # update center and radius
+        self.center = (self.center[0] + offset, self.center[1] + offset)
+        self.perimeter = new_grid
+        self.N = new_size
+    
+
     def save_grid(self, filename="perimeter.pkl"):
         with open(filename, "wb") as f:
             pickle.dump(self.perimeter_history, f)
     
-    def load_grid(self, filename="perimeter.pkl"):
+    def load_grid(self, filename="perimeter.pkl", timestep=None):
         with open(filename, "rb") as f:
             self.perimeter_history = pickle.load(f)
+        if timestep is not None:
+            record = self.perimeter_history[timestep]
+            shape = (record['radius'], record['radius'])
+            self.perimeter = np.zeros(shape)
+            for y, x in record['points']:
+                self.perimeter[y, x] = 1
+            self.N = shape[0]
+            self.center = (self.N // 2, self.N // 2)
 
     def simulate_one_particle(self, n=1, m=1):
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1),
@@ -165,16 +189,23 @@ class Perimeter:
         # update radius + center per 10 times
         if self.attached_particles % 10 == 0:
             # update center dynamically
-            self.center = self.compute_mass_center()
+            # self.center = self.compute_mass_center()
             # compute update radius
             ys, xs = np.where(self.perimeter == 1)
             self.cluster_radius = np.max(np.sqrt((ys - self.center[0]) ** 2 + (xs - self.center[1]) ** 2))
             self.populate_radius = int(max(self.populate_radius, self.cluster_radius * 3))
             self.kill_radius = self.populate_radius
+            self.expand_perimeter_if_needed()
         
         # save the timestamp and current perimeter
         self.launch_count += 1
-        self.perimeter_history[self.launch_count] = self.perimeter.copy()
+        ys, xs = np.where(self.perimeter == 1)
+        points = list(zip(ys, xs))
+        self.perimeter_history[self.launch_count] = {
+            'points': points,
+            'radius': self.perimeter.shape[0]
+        }
+        # self.perimeter_history[self.launch_count] = self.perimeter.copy()
 
     def get_number_of_particles(self):
         print(f"Attached: {self.attached_particles}, Lost: {self.lost_particles}")
@@ -185,4 +216,5 @@ class Perimeter:
         plt.imshow(self.perimeter, cmap='gray')
         plt.title(title)
         plt.axis('off')
+        plt.gca().invert_yaxis()
         plt.show()
