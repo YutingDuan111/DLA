@@ -13,7 +13,7 @@ class Perimeter:
         self.kill_radius = self.populate_radius
         self.center = (N // 2, N // 2)
         self.launch_count = 0
-        self.perimeter_history = {}  # key: launch_count, value: perimeter
+        self.perimeter_history = {}  # key: launch_count, value: 'points': points, 'radius': self.perimeter.shape[0]
         self.ETA = None
 
 
@@ -205,7 +205,6 @@ class Perimeter:
             'points': points,
             'radius': self.perimeter.shape[0]
         }
-        # self.perimeter_history[self.launch_count] = self.perimeter.copy()
 
     def get_number_of_particles(self):
         print(f"Attached: {self.attached_particles}, Lost: {self.lost_particles}")
