@@ -7,25 +7,24 @@ class Perimeter:
         self.populate_radius = 50 # don't apply dynamics radius for the first few particles
         self.kill_radius = self.populate_radius
         self.cluster_radius = 0
+        self.center = (self.populate_radius, self.populate_radius)
 
         self.N = self.populate_radius * 2
+        self.N_final = self.N
         self.perimeter = np.zeros((self.N, self.N))
-        self.center = (self.N // 2, self.N // 2)
 
         self.lost_particles = 0
         self.attached_particles = 0
         self.launch_count = 0
+        self.ETA = 0
         self.perimeter_history = {}  # key: launch_count, value: 'points': points, 'radius': self.perimeter.shape[0]
-        self.ETA = None
 
 
     def initialize_perimeter(self, core_type="dot", **kwargs):
         mid = self.N // 2
+        self.perimeter[mid, mid] = 1
 
-        if core_type == "dot":
-                self.perimeter[mid, mid] = 1
-
-        elif core_type == "circle":
+        if core_type == "circle":
             r = kwargs.get("radius", 10)
             for x in range(-r, r + 1):
                 for y in range(-r, r + 1):
@@ -37,15 +36,6 @@ class Perimeter:
             while self.attached_particles < n:
                 self.simulate_one_particle()
 
-        else:
-            raise ValueError("Unknown core_type")
-
-
-    # def compute_mass_center(self):
-    #     ys, xs = np.where(self.perimeter == 1)
-    #     cy = int(np.mean(ys))
-    #     cx = int(np.mean(xs))
-    #     return cy, cx
     
     def expand_perimeter_if_needed(self):
         new_size = int(self.populate_radius*2)  # padding on all sides
@@ -101,27 +91,35 @@ class Perimeter:
     def load_grid(self, filename="perimeter.pkl", timestamp=None):
         with open(filename, "rb") as f:
             self.perimeter_history = pickle.load(f)
-        if timestamp is not None:
+
+        if timestamp is None:
+            timestamp = self.launch_count
+        else:
             if timestamp not in self.perimeter_history:
-            # find the largest key that smaller than timestamp
-                available_timesteps = [k for k in self.perimeter_history.keys() if k < timestamp]
-                if not available_timesteps:
+                # find the largest key that smaller than timestamp
+                available_timestamps = [k for k in self.perimeter_history.keys() if k < timestamp]
+                if not available_timestamps:
                     print(f"No data available before timestep {timestamp}.")
                     return
-                timestamp = max(available_timesteps)
+                timestamp = max(available_timestamps)
             
-            record = self.perimeter_history[timestamp]
-            shape = (record['radius'], record['radius'])
-            self.perimeter = np.zeros(shape)
-            for y, x in record['points']:
-                self.perimeter[y, x] = 1
-            self.N = shape[0]
-            self.center = (self.N // 2, self.N // 2)
-            print(f"Loaded perimeter from timestamp {timestamp}")
+        record = self.perimeter_history[timestamp]
+        shape = (record['radius'], record['radius'])
+        self.perimeter = np.zeros(shape)
+        for y, x in record['points']:
+            self.perimeter[y, x] = 1
+        self.N = shape[0]
+        self.center = (self.N // 2, self.N // 2)
+        self.N_final = max(record['radius'] for record in self.perimeter_history.values())
+        print(f"Loaded perimeter from timestamp {timestamp}")
+
+
 
 
 
     def simulate_one_particle(self, n=1, m=1):
+        self.ETA = n/m
+        attached = False
 
     # Step 1: pick random point in populate_radius and let it random walk till attach to the perimeter, record it as a launch point y0, x0
         lost = True
@@ -139,6 +137,7 @@ class Perimeter:
         if n == 1 and m == 1:
             self.perimeter[yi, xi] = 1
             self.attached_particles += 1
+            attached = True
 
     # ETA > 1, Step 2: launch m particles from that point, and expect all lost
         if n > 1 and m == 1:
@@ -146,12 +145,13 @@ class Perimeter:
             for _ in range(n):
                 result = self.walk((yi, xi))
                 if not result["lost"]:
-                    all_returned = False
+                    all_escaped = False
                     break
 
             if all_escaped:
                 self.perimeter[yi, xi] = 1
                 self.attached_particles += 1
+                attached = True
             else:
                 self.lost_particles += 1
 
@@ -169,14 +169,13 @@ class Perimeter:
             if all_returned and len(returned_position) == len(set(returned_position)) :
                 self.perimeter[yi, xi] = 1
                 self.attached_particles += 1
+                attached = True
             else:
                 self.lost_particles += 1
         
 
         # update radius + center per 10 times
         if self.attached_particles % 10 == 0:
-                # update center dynamically
-                # self.center = self.compute_mass_center()
             # compute update radius
             ys, xs = np.where(self.perimeter == 1)
             self.cluster_radius = np.max(np.sqrt((ys - self.center[0]) ** 2 + (xs - self.center[1]) ** 2))
@@ -185,21 +184,32 @@ class Perimeter:
             self.expand_perimeter_if_needed()
         
 
-        # save the timestamp and current perimeter
-        ys, xs = np.where(self.perimeter == 1)
-        points = list(zip(ys, xs))
-        self.perimeter_history[self.launch_count] = {
-            'points': points,
-            'radius': self.perimeter.shape[0]
-        }
+        # save the timestamp and current perimeter if sucessfully add a new particle
+        if attached:
+            ys, xs = np.where(self.perimeter == 1)
+            points = list(zip(ys, xs))
+            self.perimeter_history[self.launch_count] = {
+                'points': points,
+                'radius': self.perimeter.shape[0]
+            }
+            self.N_final = max(self.N_final, self.perimeter.shape[0])
+
 
     def get_number_of_particles(self):
         print(f"Launched: {self.launch_count}, Attached: {self.attached_particles}, Lost: {self.lost_particles}")
 
     def get_grid(self):
-        title = f"ETA={self.n/self.m}"
+        title = f"ETA={self.ETA}"
+
+        canvas = np.zeros((self.N_final, self.N_final))
+        # add self.perimeter into the center of canvas
+        offset = (self.N_final - self.perimeter.shape[0]) // 2
+        y0, x0 = offset, offset
+        y1, x1 = y0 + self.perimeter.shape[0], x0 + self.perimeter.shape[1]
+        canvas[y0:y1, x0:x1] = self.perimeter
+        
         plt.figure(figsize=(6, 6))
-        plt.imshow(self.perimeter, cmap='gray')
+        plt.imshow(canvas, cmap='gray')
         plt.title(title)
         plt.axis('off')
         plt.gca().invert_yaxis()
