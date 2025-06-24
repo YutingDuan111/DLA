@@ -139,8 +139,9 @@ class Perimeter:
             self.attached_particles += 1
             attached = True
 
-    # ETA > 1, Step 2: launch m particles from that point, and expect all lost
+    # ETA > 1, Step 2: launch n particles from that point, and expect all lost
         if n > 1 and m == 1:
+            n = n - 1
             all_escaped = True
             for _ in range(n):
                 result = self.walk((yi, xi))
@@ -155,7 +156,7 @@ class Perimeter:
             else:
                 self.lost_particles += 1
 
-    # ETA < 1, Step 2: launch n particles from that point, and expect all returned into the perimeter with diff positions
+    # ETA < 1, Step 2: launch m particles from that point, and expect all returned into the perimeter with diff positions
         if n == 1 and m > 1:
             all_returned = True
             returned_position = [] # use to track if all returned positions are different
@@ -165,14 +166,43 @@ class Perimeter:
                     all_returned = False
                     break
                 returned_position.append(result["final_position"])
-                    
+    
             if all_returned and len(returned_position) == len(set(returned_position)) :
                 self.perimeter[yi, xi] = 1
                 self.attached_particles += 1
                 attached = True
             else:
                 self.lost_particles += 1
-        
+
+    # ETA is a fraction, Step 2:    
+        if n > 1 and m > 1:
+            # launch n particles from that point, and and expect all lost; 
+            n = n - 1
+            all_escaped = True
+            for _ in range(n):
+                result = self.walk((yi, xi))
+                if not result["lost"]:
+                    all_escaped = False
+                    break
+            
+            # launch m particles, and expect all returned into the perimeter with diff positions 
+            all_returned = True
+            returned_position = [] # use to track if all returned positions are different
+            for _ in range(m):
+                result = self.walk((yi, xi))
+                if result["lost"]:
+                    all_returned = False
+                    break
+                returned_position.append(result["final_position"])
+
+            # check
+            if all_escaped and all_returned and len(returned_position) == len(set(returned_position)) :
+                self.perimeter[yi, xi] = 1
+                self.attached_particles += 1
+                attached = True
+            else:
+                self.lost_particles += 1
+
 
         # update radius + center per 10 times
         if self.attached_particles % 10 == 0:
