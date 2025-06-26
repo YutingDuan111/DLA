@@ -84,10 +84,16 @@ class Perimeter:
 
 
 
-    def save_grid(self, filename="perimeter.pkl"):
+    def save_pickle(self, filename="perimeter.pkl"):
         with open(filename, "wb") as f:
             pickle.dump(self.perimeter_history, f)
+
+    def load_pickle(self, filename="perimeter.pkl"):
+        with open(filename, "rb") as f:
+            self.perimeter_history = pickle.load(f)
+        print(f"Loaded perimeter history from {filename}")
     
+
     def load_grid(self, filename="perimeter.pkl", timestamp=None):
         with open(filename, "rb") as f:
             self.perimeter_history = pickle.load(f)

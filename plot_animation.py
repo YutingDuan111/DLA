@@ -1,8 +1,8 @@
-import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 import ETA
-from matplotlib.colors import LinearSegmentedColormap
 
 plt.style.use('dark_background')
 
